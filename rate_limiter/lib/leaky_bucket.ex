@@ -7,7 +7,7 @@ defmodule RateLimiter.LeakyBucket do
     request_pop_in_ms = floor(:timer.seconds(1) / requests_per_second)
 
     state = %{
-      requests_queue: :queue.new(),
+      request_queue: :queue.new(),
       queue_length: 0,
       requests_per_second: requests_per_second,
       request_pop_in_ms: request_pop_in_ms
@@ -29,7 +29,10 @@ defmodule RateLimiter.LeakyBucket do
   end
 
   @impl true
-  def handle_info(:pop_request, %{queue_length: queue_length, request_queue: request_queue} = state) do
+  def handle_info(
+        :pop_request,
+        %{queue_length: queue_length, request_queue: request_queue} = state
+      ) do
     {{:value, requesting_process}, updated_request_queue} = :queue.out(request_queue)
     GenServer.reply(requesting_process, :ok)
 
@@ -43,12 +46,14 @@ defmodule RateLimiter.LeakyBucket do
 
   @impl true
   def handle_call(
-    :wait_for_turn,
-    from,
-    %{queue_length: original_queue_length, request_queue: request_queue} = state
-    ) do
+        :wait_for_turn,
+        from,
+        %{queue_length: original_queue_length, request_queue: request_queue} = state
+      ) do
     updated_request_queue = :queue.in(from, request_queue)
-    updated_state = state
+
+    updated_state =
+      state
       |> Map.put(:request_queue, updated_request_queue)
       |> Map.put(:queue_length, original_queue_length + 1)
 
